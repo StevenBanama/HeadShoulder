@@ -167,6 +167,7 @@ def main(params):
    callbacks = [
         ModelCheckpoint(save_path, monitor='val_class_accuracy', verbose=1, save_best_only=True, mode='max'),
         TensorBoard(log_dir=log_dir, batch_size=batch_size, write_images=True, update_freq='epoch'),
+        ReduceLROnPlateau(monitor='val_age_mean_absolute_error', factor=0.1, patience=5, min_lr=0.00001),
         LambdaCallback(on_epoch_end=get_weights)
    ]
 
@@ -178,7 +179,7 @@ def main(params):
    with session.as_default(), graph.as_default():
        history = models.fit_generator(train_gen,
            workers=params.worker, use_multiprocessing=True,
-           steps_per_epoch=len(trainset) / batch_size, epochs=30,
+           steps_per_epoch=len(trainset) / batch_size, epochs=80,
            callbacks=callbacks, validation_data=validation_gen,
            validation_steps=len(testset) / batch_size * 3)
 
