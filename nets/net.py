@@ -139,6 +139,15 @@ def init_parse():
         choices=['pnet', "rnet", 'onet'],
         help='pnet|rnet|onet')
 
+    parser.add_argument(
+        '-lr', '--lr', default=0.002, type=float,
+        help='learning rate')
+
+    parser.add_argument(
+        '-w', '--worker', default=2, type=float,
+        help='mutil process worker')
+
+
     params = parser.parse_args()
     return params
 
@@ -148,7 +157,7 @@ def main(params):
    seed = 2019
    save_path = os.path.join(params.model_path, "%s.h5"%params.net)
    pretrain_path = save_path
-   models, graph, session = BuildModel(params.net, pretrain_path=pretrain_path, is_train=True)
+   models, graph, session = BuildModel(params.net, lr=params.lr, pretrain_path=pretrain_path, is_train=True)
    log_dir = params.log
    input_size = get_size(params.net)
    
@@ -168,6 +177,7 @@ def main(params):
    validation_gen = generate_data_generator(testset, input_size=input_size, batch_size=batch_size)
    with session.as_default(), graph.as_default():
        history = models.fit_generator(train_gen,
+           workers=params.worker, use_multiprocessing=True,
            steps_per_epoch=len(trainset) / batch_size, epochs=30,
            callbacks=callbacks, validation_data=validation_gen,
            validation_steps=len(testset) / batch_size * 3)
