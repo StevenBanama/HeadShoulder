@@ -144,7 +144,7 @@ def init_parse():
         help='learning rate')
 
     parser.add_argument(
-        '-w', '--worker', default=2, type=float,
+        '-w', '--worker', default=2, type=int,
         help='mutil process worker')
 
 
@@ -167,7 +167,7 @@ def main(params):
    callbacks = [
         ModelCheckpoint(save_path, monitor='val_class_accuracy', verbose=1, save_best_only=True, mode='max'),
         TensorBoard(log_dir=log_dir, batch_size=batch_size, write_images=True, update_freq='epoch'),
-        ReduceLROnPlateau(monitor='val_age_mean_absolute_error', factor=0.1, patience=5, min_lr=0.00001),
+        ReduceLROnPlateau(monitor='val_class_accuracy', factor=0.1, patience=5, min_lr=0.00001),
         LambdaCallback(on_epoch_end=get_weights)
    ]
 
