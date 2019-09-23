@@ -10,24 +10,18 @@ import keras.backend as K
 class Detector(object):
 
     def __init__(self):
-        self.net_params = [
-            ("pnet", "./models/pnet.h5", 12),
-            ("rnet", "./models/rnet.h5", 24),
-        ]
         self.stride = 2  # search stride
         self.models = {}  # model path
         self.scale_factor = 0.709  # image search scale
         self.min_size = 12
-        self.threshold = [0.65, 0.7, 0.9]
+        self.threshold = [0.65, 0.7, 0.97]
         self.input_size = (640, 480, 3)
         self.init_net()
 
     def init_net(self):
-        #for (net, path, size) in self.net_params:
-        #    print("load net: %s"%net)
-        #    self.models[net] = BuildModel(net, pretrain_path=path)
         self.models["pnet"], self.pgraph, self.psess = BuildModel("pnet", pretrain_path="./models/pnet.h5")
         self.models["rnet"], self.rgraph, self.rsess = BuildModel("rnet", pretrain_path="./models/rnet.h5")
+        self.models["onet"], self.ograph, self.osess = BuildModel("onet", pretrain_path="./models/onet.h5")
 
     def predict(self, cv_img):
         with self.pgraph.as_default():
@@ -36,7 +30,10 @@ class Detector(object):
         with self.rgraph.as_default():
             with self.rsess.as_default():
                 rnet_candis = self.run_rnet(self.models["rnet"], cv_img, candis)
-                
+        with self.ograph.as_default():
+            with self.osess.as_default():
+                onet_candis = self.run_onet(self.models["onet"], cv_img, candis)
+
 
     def run_pnet(self, models, image, size=12):
         height, width = image.shape[:2]
@@ -95,8 +92,35 @@ class Detector(object):
             rh = int(rh * (1 + reg_box[idx][3]))
             rnet_candis.append([rx, ry, rw, rh, mask_prob[idx]])
         rnet_candis = NMS(rnet_candis, 0.4, "min")
-        print(rnet_candis)
+        '''
         for (rx, ry, rw, rh, _) in rnet_candis:
             cv2.rectangle(image, (rx, ry), (rx+rw, ry+rh), (0, 255, 0), 2)
         cv2.imwrite("test_pri.jpg", image)
-        return None
+        '''
+        return rnet_candis
+
+    def run_onet(self, models, image, candis):
+        feedbox = []
+        for (rx, ry, rw, rh, _) in candis:
+            feedbox.append(cv2.resize(image[ry:ry+rh, rx:rx+rw, :], (48, 48)))
+        
+        onet_candis = models.predict(np.array(feedbox))
+        mask = onet_candis[0][:, 1] > self.threshold[2]
+        mask_prob = onet_candis[0][:, 1][mask]
+        candis = np.array(candis)[mask]
+        reg_box = onet_candis[1][mask]
+        onet_candis = []
+        for idx, (rx, ry, rw, rh, _) in enumerate(candis):
+            rx, ry, rw, rh = map(int, [rx, ry, rw, rh])
+            #cv2.rectangle(cv_img, (rx, ry), (rx+rw, ry+rh), (0, 0, 255), 2)
+            rx = int(rx * (1 + reg_box[idx][0]))
+            ry = int(ry * (1 + reg_box[idx][1]))
+            rw = int(rw * (1 + reg_box[idx][2]))
+            rh = int(rh * (1 + reg_box[idx][3]))
+            onet_candis.append([rx, ry, rw, rh, mask_prob[idx]])
+        onet_candis = NMS(onet_candis, 0.4, "min")
+        for (rx, ry, rw, rh, _) in onet_candis:
+            cv2.rectangle(image, (rx, ry), (rx+rw, ry+rh), (0, 255, 0), 2)
+        #cv2.imwrite("test_pri.jpg", image)
+        print(onet_candis) 
+        return onet_candis

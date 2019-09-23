@@ -14,7 +14,7 @@ import tensorflow as tf
 # total loss = \sum_{i=0}^N \sum_{j \in \{\ det, box, landmark }} \alpha_j * \beta_i^j * L_i^j
 # \beta is a indicator in {0, 1}, when is background=0, ground truth =1
 
-def cls_ohem(package_data, p_class, top=0.7):
+def cls_ohem(package_data, p_class, top=0.7, epsilon=10**-8):
     # label: true class 
     # package_data: (class, box, landmarks)
     print(package_data, p_class)
@@ -28,7 +28,7 @@ def cls_ohem(package_data, p_class, top=0.7):
 
     cate_one_hot = tf.squeeze(tf.one_hot(cate, 2))
     nums = tf.cast(tf.reduce_sum(tf.cast(mask, tf.float32)) * top, tf.int32)
-    cross_entropy1 = -tf.reduce_sum(cate_one_hot * tf.log(p_class), -1)
+    cross_entropy1 = -tf.reduce_sum(cate_one_hot * tf.log(p_class + epsilon), -1)
     mask_ce = tf.where(mask, cross_entropy1, tf.zeros_like(cross_entropy1))
     values, _ = tf.nn.top_k(mask_ce, nums)
     return tf.reduce_mean(values)

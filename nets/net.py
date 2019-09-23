@@ -64,7 +64,7 @@ def output_net(input):
     block4 = PReLU(shared_axes=[1, 2])(Conv2D(64, (2, 2), padding="valid", strides=(1, 1), name="conv4")(block3))
     block4 = Reshape((-1,))(block4)
 
-    dense = PReLU(shared_axes=[1, 2], name="o_feat")(Dense(128)(block4))
+    dense = PReLU(name="o_feat")(Dense(128)(block4))
 
     cate = Dense(2, activation=softmax, name="class")(dense)
     boxes = Dense(4, activity_regularizer=regularizers.l2(0.0005), name="box")(dense)
@@ -144,7 +144,7 @@ def init_parse():
         help='learning rate')
 
     parser.add_argument(
-        '-w', '--worker', default=2, type=int,
+        '-w', '--worker', default=1, type=int,
         help='mutil process worker')
 
 
@@ -178,7 +178,7 @@ def main(params):
    validation_gen = generate_data_generator(testset, input_size=input_size, batch_size=batch_size)
    with session.as_default(), graph.as_default():
        history = models.fit_generator(train_gen,
-           workers=params.worker, use_multiprocessing=True,
+           workers=params.worker, use_multiprocessing=False,
            steps_per_epoch=len(trainset) / batch_size, epochs=80,
            callbacks=callbacks, validation_data=validation_gen,
            validation_steps=len(testset) / batch_size * 3)

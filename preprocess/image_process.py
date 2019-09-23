@@ -121,7 +121,7 @@ def gen_from_ground_truth(path, img, gt_boxes, keypoints, input_size=12, neg_num
                 data["crop_image"].append(cv2.resize(img[ny1:ny2+1, nx1:nx2+1,:], (input_size, input_size)).dumps())  # mat is not big enough, so do not encode img
                 #if dtype == 2:
                 #    cv2.rectangle(img, (nx1, ny1), (nx2, ny2), (0, 255, 0), 2)
-        cv2.imwrite("img_%s.jpg"%(int(time.time())), img)
+        #cv2.imwrite("img_%s.jpg"%(int(time.time())), img)
         return pd.DataFrame(data)
 
 def init_parse():
@@ -152,10 +152,10 @@ def main():
        size = 24
     elif net == "onet":
        size = 48
-    process(dataframe, size, "./data/pnet_1.feather")
-    pool = Pool(7)
+    #process(dataframe, size, "./data/pnet_1.feather")
+    pool = Pool(3)
     print(dataframe.size)
-    for g, df in dataframe.groupby(np.arange(len(dataframe)) // 10000):
+    for g, df in dataframe.groupby(np.arange(len(dataframe)) // 2000):
         pool.apply_async(process, (df, size, "./data/%s_%s.feather"%(net, g),))
     pool.close()
     pool.join()
