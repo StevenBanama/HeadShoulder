@@ -17,7 +17,10 @@ def gen_input(image, size=12, stride=12):
     return np.array(input)
 
 def video(params=None):
-    cap = cv2.VideoCapture("rtmp://rtmp01open.ys7.com/openlive/bd02a353615b4a12b1404f605218cb73.hd")
+    cap = cv2.VideoCapture(0)
+    #cap.open("rtmp://rtmp01open.ys7.com/openlive/bd02a353615b4a12b1404f605218cb73.hd")
+
+    K.set_learning_phase(0)
     det = Detector()
 
     while True:
