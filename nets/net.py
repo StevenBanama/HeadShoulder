@@ -147,12 +147,16 @@ def init_parse():
         '-w', '--worker', default=1, type=int,
         help='mutil process worker')
 
+    parser.add_argument(
+        '-b', '--batch-size', default=256, type=int,
+        help='batch size')
+
 
     params = parser.parse_args()
     return params
 
 def main(params):
-   batch_size = 256
+   batch_size = params.batch_size
    sample_rate = 0.8
    seed = 2019
    save_path = os.path.join(params.model_path, "%s.h5"%params.net)
@@ -175,10 +179,10 @@ def main(params):
    trainset, testset = train_test_split(dataframe, train_size=sample_rate, test_size=1-sample_rate, random_state=seed)
 
    train_gen = generate_data_generator(trainset, input_size=input_size, batch_size=batch_size)
-   validation_gen = generate_data_generator(testset, input_size=input_size, batch_size=batch_size)
+   validation_gen = generate_data_generator(testset, input_size=input_size, batch_size=batch_size, is_training=False)
    with session.as_default(), graph.as_default():
        history = models.fit_generator(train_gen,
-           workers=params.worker, use_multiprocessing=False,
+           workers=params.worker, use_multiprocessing=bool(params.worker > 1),
            steps_per_epoch=len(trainset) / batch_size, epochs=80,
            callbacks=callbacks, validation_data=validation_gen,
            validation_steps=len(testset) / batch_size * 3)

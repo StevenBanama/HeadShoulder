@@ -4,6 +4,7 @@ import re
 import cv2
 import numpy as np
 import pandas as pd
+import random
 from preprocess.Pnet_process import Btype
 from sklearn.utils import shuffle
 from keras.backend import categorical_crossentropy
@@ -15,7 +16,7 @@ import tensorflow as tf
 # \beta is a indicator in {0, 1}, when is background=0, ground truth =1
 
 def cls_ohem(package_data, p_class, top=0.7, epsilon=10**-8):
-    # label: true class 
+    # label: true class
     # package_data: (class, box, landmarks)
     print(package_data, p_class)
     if len(p_class.get_shape()) == 4:
@@ -60,7 +61,8 @@ def landmark_ohem(package_data, ppoint, top=0.7):
 
     gbound = tf.gather(g_class, indices=[x for x in xrange(1, 5)], axis=-1)
     gpoints = tf.gather(g_class, indices=[x for x in xrange(5, 19)], axis=-1)
-    values, _ = tf.nn.top_k(tf.reduce_mean(tf.abs(gpoints - ppoint), axis=-1), nums)
+    gp_mask = tf.cast(tf.equal(gpoints, 0), tf.float32)  # keypoints of ground truth is 0 which means hidden
+    values, _ = tf.nn.top_k(tf.reduce_mean(tf.abs(gpoints - ppoint) * gp_mask, axis=-1), nums)
     return tf.reduce_mean(values)
 
 def accuracy(package_data, p_class):
@@ -75,6 +77,36 @@ def accuracy(package_data, p_class):
     cate_one_hot = tf.reshape(tf.one_hot(cate, tf.constant(2, tf.int32)), [-1, 2])
 
     return categorical_accuracy(cate_one_hot, tf.reshape(p_class, [-1, 2]))
+
+
+def rotate(img, norm_box, norm_keypoints, alpha):
+    """
+        given a face with bbox and landmark, rotate with alpha
+        and return rotated face with bbox, landmark (absolute position)
+    """
+    height, width = img.shape[:2]
+    center = (width // 2, height // 2)
+    rot_mat = cv2.getRotationMatrix2D(center, alpha, 1)
+    #whole image rotate
+    #pay attention: 3rd param(col*row)
+    img = cv2.warpAffine(img, rot_mat, (width, height))
+    keypoints_ = np.asarray([
+        (rot_mat[0][0] * x + rot_mat[0][1] * y + rot_mat[0][2],
+         rot_mat[1][0] * x + rot_mat[1][1] * y + rot_mat[1][2])
+         for (x, y) in norm_keypoints
+    ])
+    return (img, norm_box, keypoints_)
+
+
+def flip(img, bbox, keypoints):
+    """flip"""
+    flip_img = cv2.flip(img, 1)
+    #mirror
+    kps = np.asarray([(1-x, y) for (x, y) in keypoints])
+    kps[[1, 2]] = kps[[2, 1]]  # left eye<->right eye
+    kps[[3, 4]] = kps[[4, 3]]  # left ear<->right ear
+    kps[[5, 6]] = kps[[6, 5]]  # left shoulder<->right shoulder
+    return (flip_img, bbox, kps)
 
 def load_data(data_dir, ptn="pnet"):
     data = []
@@ -98,22 +130,22 @@ def load_data(data_dir, ptn="pnet"):
     sample_data = shuffle(sample_data)
     return sample_data
 
-def image_enforcing(img, contrast=(0.5, 2.5), bright=(-50, 50), rotation=(-15, 15)):
+def image_enforcing(img, norm_box, norm_keypoints, contrast=(0.5, 2.5), bright=(-50, 50), rotation=(-15, 15)):
     flag = random.randint(0, 3)
+    norm_keypoints = np.array(norm_keypoints).reshape((-1, 2))
     if flag == 1:  # trans hue
         img = cv2.convertScaleAbs(img, alpha=random.uniform(*contrast), beta=random.uniform(*bright))
     elif flag == 2:  # rotation
-        height, width = img.shape[:-1]
-        matRotate = cv2.getRotationMatrix2D((height, width), random.randint(-15, 15), 1) # mat rotate 1 center 2 angle 3 缩放系数
-        img = cv2.warpAffine(img, matRotate, (height, width))
+        alpha = random.randint(*rotation)
+        img, norm_box, norm_keypoints = rotate(img, norm_box, norm_keypoints, alpha)
     elif flag == 3:  # flp 翻转
-        img = cv2.flip(img, 1)
-    return img
+        img, norm_box, norm_keypoints = flip(img, norm_box, norm_keypoints)
+    return img, norm_box, norm_keypoints.reshape((-1,)).tolist()
 
 def image_transform(idx, row, input_size=12, is_training=True):
     if row.crop_image:
         input_img = np.loads(row.crop_image)
-    else: 
+    else:
         img = cv2.imread(row.file_name)
         cropped = np.loads(row.cropped)
         x1, y1, x2, y2 = map(int, cropped.tolist())
@@ -124,6 +156,9 @@ def image_transform(idx, row, input_size=12, is_training=True):
         #cv2.imwrite("%s.jpg"%idx, img[y1:y2,x1:x2, :])
     #if img[y1:y2, x1:x2, :].size == 0:
         #print("dddddd", cropped, y1, y2, x1, x2, img.shape, row.file_name, btype)
+
+    if is_training:
+        input_img, normbox, norm_points = image_enforcing(input_img, normbox, norm_points)
     result = np.concatenate((btype, normbox, norm_points,))  # 0: class, 1-4: boundbox, 5-19: keypoints
     return input_img, result
 
@@ -154,7 +189,7 @@ def gen_input(image, size=12, stride=12):
     return np.array(input)
 
 def NMS(boxes, thres=0.5, ntype="union"):
-    # boxes: [[x, y, w, h, prob]...]
+    # boxes: [[x, y, x2, y2, prob]...]
     boxes = sorted(boxes, cmp=lambda x, y: -cmp(x[-1], y[-1]))
     output = []
     for b in boxes:
@@ -168,15 +203,15 @@ def NMS(boxes, thres=0.5, ntype="union"):
     return output
 
 def cal_nms(b1, b2, threshold, ntype="union"):
-    x1, y1, w1, h1 = b1[:4]
-    x2, y2, w2, h2 = b2[:4]
-    inter = abs(min(x1+w1, x2+w2) - max(x1, x2)) * abs(min(y1+h1, y2+h2) - max(y1, y2))
+    fx1, fy1, fx2, fy2 = b1[:4]
+    sx1, sy1, sx2, sy2 = b2[:4]
+    inter = (min(fx2, sx2) - max(fx1, sx1)) * (min(fy2, sy2) - max(fy1, sy1))
+    w1, h1, w2, h2 = (fx2 - fx1), (fy2 -fy1), (sx2 - sx1), (sy2 - sy1)
     if ntype == "union":
-        return inter * 1.0 / (w1*h1 + w2*h2 - inter + 0.0000000001) < threshold
+        return inter * 1.0 / (w1 * h1 + w2 * h2 - inter + 0.0000000001) < threshold
     elif ntype == "min":
-        return inter * 1.0 / min(w1*h1, w2*h2) < threshold
-    return False
-      
+        return inter * 1.0 / min(w1 * h1, w2 * h2) < threshold
+    return True
 
 if __name__ == "__main__":
     dataframe = load_data("./data/")

@@ -34,7 +34,6 @@ class Detector(object):
             with self.osess.as_default():
                 onet_candis = self.run_onet(self.models["onet"], cv_img, candis)
 
-
     def run_pnet(self, models, image, size=12):
         height, width = image.shape[:2]
         pnet_candis = []
@@ -42,21 +41,36 @@ class Detector(object):
         while height * scale >= self.min_size and width * scale >= self.min_size:
             h, w = int(height * scale), int(width * scale)
             scale_img = cv2.resize(image, (w, h))
-            b = models.predict(np.array([scale_img]))
-            probs = b[0][:, :, :, 1]
-            boxes = self.selection(image, probs[0], b[1][0], scale, size)
+            probs, reg_box, reg_point = models.predict(np.array([scale_img]))
+            probs = probs[:, :, :, 1]
+            boxes = self.selection(image, probs[0], reg_box[0], scale, size)
             nms_boxes = NMS(boxes, 0.5, "union")
-            print("nms_boxes!!!", len(nms_boxes))
             pnet_candis += nms_boxes
             scale *= self.scale_factor
         pnet_candis = NMS(pnet_candis, 0.7, "union")
-
-        '''cp_img = image.copy()
-        for (rx, ry, rw, rh, _) in pnet_candis:
-            cv2.rectangle(cp_img, (rx, ry), (rx+rw, ry+rh), (0, 255, 0), 2)
-        cv2.imwrite("test_pnet.jpg", cp_img)
-        '''
+        pnet_candis = self.box_regression(image, pnet_candis)
         return pnet_candis
+
+    def box_regression(self, image, candis, square_padding=True):
+        # 0:4-> box  5:9 box-reg 9->prob
+        cp_img = image.copy()
+        result = []
+        for elm in candis:
+            #rx1, ry1, rx2, ry2, reg_x1, reg_y1, reg_x2, reg_y2, prob = elm
+            loc, prob = np.array(elm[:8]), elm[-1]
+            loc = loc.reshape((-1, 2))  #  4 * 2
+            loc[:2] += loc[2:4]
+            rx1, ry1, rx2, ry2 = loc[:2].reshape((-1,))
+            if square_padding:
+                w, h = loc[1] - loc[0]
+                square_size = max(w, h)
+                rx1 = rx1 + square_size / 2 - w / 2
+                rx2 = rx2 + square_size / 2 - w / 2
+                ry1 = ry1 + square_size / 2 - h / 2
+                ry2 = ry2 + square_size / 2 - h / 2
+
+            result.append([rx1, ry1, rx2, ry2, 0, 0, 0, 0, prob])
+        return result
 
     def selection(self, image, probs, boxes_reg, scale, size=12):
         candis = []
@@ -64,63 +78,69 @@ class Detector(object):
         for c in xrange(w):
             for r in xrange(h):
                 if probs[r][c] > self.threshold[0]:
-                    reg_box = reg_x, reg_y, reg_w, reg_h = boxes_reg[r][c]
-                    rx = int((c * self.stride + reg_x * size) / scale)
-                    ry = int((r * self.stride + reg_y * size) / scale)
+                    reg_box = reg_x1, reg_y1, reg_x2, reg_y2 = boxes_reg[r][c]
+                    rx1 = int((c * self.stride) / scale)
+                    ry1 = int((r * self.stride) / scale)
+                    rx2 = int((c * self.stride + size) / scale)
+                    ry2 = int((r * self.stride + size) / scale)
+                    reg_x1 = int((reg_x1 * size) / scale)
+                    reg_y1 = int((reg_y1 * size) / scale)
+                    reg_x2 = int((reg_x2 * size) / scale)
+                    reg_y2 = int((reg_y2 * size) / scale)
 
-                    rw = int(size * (1 + reg_w) / scale)  # 注意暂时先这么改，  等数据远改过来一定要搞改成 
-                    rh = int(size * (1 + reg_h) / scale)
-                    candis.append([rx, ry, rw, rh, probs[r][c]])
+                    candis.append([rx1, ry1, rx2, ry2, reg_x1, reg_y1, reg_x2, reg_y2, probs[r][c]])
         return candis
 
     def run_rnet(self, models, image, candis):
-        feedbox = [] 
-        for (rx, ry, rw, rh, _) in candis:
-            feedbox.append(cv2.resize(image[ry:ry+rh, rx:rx+rw,:], (24, 24)))
+        feedbox = []
+        for elm in candis:
+            rx1, ry1, rx2, ry2 = elm[:4]
+            feedbox.append(cv2.resize(image[ry1:ry2+1, rx1:rx2+1,:], (24, 24)))
         rnet_candis = models.predict(np.array(feedbox))
         mask = rnet_candis[0][:, 1] > self.threshold[1]
-        mask_prob = rnet_candis[0][:, 1][mask]
-        candis = np.array(candis)[mask]
-        reg_box = rnet_candis[1][mask]
+        mask_prob = rnet_candis[0][:, 1]
+        reg_box = rnet_candis[1]
         rnet_candis = []
-        for idx, (rx, ry, rw, rh, _) in enumerate(candis):
-            rx, ry, rw, rh = map(int, [rx, ry, rw, rh])
-            #cv2.rectangle(cv_img, (rx, ry), (rx+rw, ry+rh), (0, 0, 255), 2)
-            rx = int(rx * (1 + reg_box[idx][0]))
-            ry = int(ry * (1 + reg_box[idx][1]))
-            rw = int(rw * (1 + reg_box[idx][2]))
-            rh = int(rh * (1 + reg_box[idx][3]))
-            rnet_candis.append([rx, ry, rw, rh, mask_prob[idx]])
+        for idx, elm in enumerate(candis):
+            if mask_prob[idx] < self.threshold[1]:
+                 continue
+            rx1, ry1, rx2, ry2 = map(int, elm[:4])
+            reg_rx1 = int(rx1 * reg_box[idx][0])
+            reg_ry1 = int(ry1 * reg_box[idx][1])
+            reg_rx2 = int(rx2 * reg_box[idx][2])
+            reg_ry2 = int(ry2 * reg_box[idx][3])
+            rnet_candis.append([rx1, ry1, rx2, ry2, reg_rx1, reg_ry1, reg_rx2, reg_ry2, mask_prob[idx]])
         rnet_candis = NMS(rnet_candis, 0.4, "min")
-        '''
-        for (rx, ry, rw, rh, _) in rnet_candis:
-            cv2.rectangle(image, (rx, ry), (rx+rw, ry+rh), (0, 255, 0), 2)
-        cv2.imwrite("test_pri.jpg", image)
-        '''
+        rnet_candis = self.box_regression(image, rnet_candis)
         return rnet_candis
 
     def run_onet(self, models, image, candis):
         feedbox = []
-        for (rx, ry, rw, rh, _) in candis:
-            feedbox.append(cv2.resize(image[ry:ry+rh, rx:rx+rw, :], (48, 48)))
-        
+        for elm in candis:
+            rx1, ry1, rx2, ry2 = elm[:4]
+            feedbox.append(cv2.resize(image[ry1:ry2+1, rx1:rx2+1,:], (48, 48)))
+
         onet_candis = models.predict(np.array(feedbox))
-        mask = onet_candis[0][:, 1] > self.threshold[2]
-        mask_prob = onet_candis[0][:, 1][mask]
-        candis = np.array(candis)[mask]
-        reg_box = onet_candis[1][mask]
+        mask_prob = onet_candis[0][:, 1]
+        candis = np.array(candis)
+        reg_box = onet_candis[1]
         onet_candis = []
-        for idx, (rx, ry, rw, rh, _) in enumerate(candis):
-            rx, ry, rw, rh = map(int, [rx, ry, rw, rh])
-            #cv2.rectangle(cv_img, (rx, ry), (rx+rw, ry+rh), (0, 0, 255), 2)
-            rx = int(rx * (1 + reg_box[idx][0]))
-            ry = int(ry * (1 + reg_box[idx][1]))
-            rw = int(rw * (1 + reg_box[idx][2]))
-            rh = int(rh * (1 + reg_box[idx][3]))
-            onet_candis.append([rx, ry, rw, rh, mask_prob[idx]])
+        for idx, elm in enumerate(candis):
+            if mask_prob[idx] < self.threshold[1]:
+                 continue
+            rx1, ry1, rx2, ry2 = map(int, elm[:4])
+            reg_rx1 = int(rx1 * reg_box[idx][0])
+            reg_ry1 = int(ry1 * reg_box[idx][1])
+            reg_rx2 = int(rx2 * reg_box[idx][2])
+            reg_ry2 = int(ry2 * reg_box[idx][3])
+
+            onet_candis.append([rx1, ry1, rx2, ry2, reg_rx1, reg_ry1, reg_rx2, reg_ry2, mask_prob[idx]])
         onet_candis = NMS(onet_candis, 0.4, "min")
-        for (rx, ry, rw, rh, _) in onet_candis:
-            cv2.rectangle(image, (rx, ry), (rx+rw, ry+rh), (0, 255, 0), 2)
-        #cv2.imwrite("test_pri.jpg", image)
-        print(onet_candis) 
+        '''
+        for elm in onet_candis:
+            rx1, ry1, rx2, ry2 = elm[:4]
+            cv2.rectangle(image, (rx1, ry1), (rx2, ry2), (0, 255, 0), 2)
+        cv2.imwrite("test_pri.jpg", image)
+        '''
+        print(onet_candis)
         return onet_candis

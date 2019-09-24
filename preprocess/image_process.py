@@ -59,7 +59,7 @@ def gen_from_ground_truth(path, img, gt_boxes, keypoints, input_size=12, neg_num
     for idx, gt_box in enumerate(gt_boxes):
         x1, y1, x2, y2 = gt_box
         w, h = x2 - x1, y2 - y1
-        nums = 5  
+        nums = 5
         for x in xrange(nums):
             size = np.random.randint(12, min(width, height) / 2)
             # delta_x and delta_y are offsets of (x1, y1)
@@ -102,7 +102,7 @@ def gen_from_ground_truth(path, img, gt_boxes, keypoints, input_size=12, neg_num
             if nx2 > width or ny2 > height:
                 continue 
             crop_box = np.array([nx1, ny1, nx2, ny2])
-            norm_bound = np.array([(x1 - nx1) * 1.0 / size, (y1 - ny1) * 1.0 / size, (w - size) * 1.0 / size, (h - size) * 1.0 / size])
+            norm_bound = np.array([(x1 - nx1) * 1.0 / size, (y1 - ny1) * 1.0 / size, (x2 - nx2) * 1.0 / size, (y2 - ny2) * 1.0 / size])
             norm_points = ((keypoints[idx].reshape((-1, 3,)) - np.array([nx1, ny1, 0])) * 1.0 / size)[:,:2].reshape((-1))
 
             iou_frac = IOU(crop_box, gt_boxes)
@@ -136,6 +136,11 @@ def init_parse():
         '-p', '--preprocess-path',
         default="./preprocess/test.feather", type=str,
         help='candi dataset path')
+    parser.add_argument(
+        '-w', '--workers',
+        default=3, type=int,
+        help='workers')
+
     params = parser.parse_args()
     return params
 
@@ -153,7 +158,7 @@ def main():
     elif net == "onet":
        size = 48
     #process(dataframe, size, "./data/pnet_1.feather")
-    pool = Pool(3)
+    pool = Pool(params.workers)
     print(dataframe.size)
     for g, df in dataframe.groupby(np.arange(len(dataframe)) // 2000):
         pool.apply_async(process, (df, size, "./data/%s_%s.feather"%(net, g),))
