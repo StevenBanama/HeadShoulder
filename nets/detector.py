@@ -15,7 +15,7 @@ class Detector(object):
         self.scale_factor = 0.809  # image search scale
         self.min_size = 12
         self.min_box = 24
-        self.threshold = [0.7, 0.8, 0.97]
+        self.threshold = [0.7, 0.8, 0.95]
         self.input_size = (640, 480, 3)
         self.init_net()
 
@@ -33,7 +33,7 @@ class Detector(object):
                 rnet_candis = self.run_rnet(self.models["rnet"], cv_img, candis)
         with self.ograph.as_default():
             with self.osess.as_default():
-                onet_candis = self.run_onet(self.models["onet"], cv_img, candis)
+                onet_candis = self.run_onet(self.models["onet"], cv_img, rnet_candis)
 
     def run_pnet(self, models, image, size=12):
         height, width = image.shape[:2]
@@ -95,7 +95,9 @@ class Detector(object):
                     candis.append([rx1, ry1, rx2, ry2, reg_x1, reg_y1, reg_x2, reg_y2, probs[r][c]])
         return candis
 
-    def run_rnet(self, models, image, candis):
+    def run_rnet(self, models, image, candis, size=24):
+        if not candis:
+            return []
         feedbox = []
         for elm in candis:
             rx1, ry1, rx2, ry2 = elm[:4]
@@ -109,16 +111,18 @@ class Detector(object):
             if mask_prob[idx] < self.threshold[1]:
                  continue
             rx1, ry1, rx2, ry2 = map(int, elm[:4])
-            reg_rx1 = int(rx1 * reg_box[idx][0])
-            reg_ry1 = int(ry1 * reg_box[idx][1])
-            reg_rx2 = int(rx2 * reg_box[idx][2])
-            reg_ry2 = int(ry2 * reg_box[idx][3])
+            reg_rx1 = int(size * reg_box[idx][0])
+            reg_ry1 = int(size * reg_box[idx][1])
+            reg_rx2 = int(size * reg_box[idx][2])
+            reg_ry2 = int(size * reg_box[idx][3])
             rnet_candis.append([rx1, ry1, rx2, ry2, reg_rx1, reg_ry1, reg_rx2, reg_ry2, mask_prob[idx]])
         rnet_candis = NMS(rnet_candis, 0.4, "min")
         rnet_candis = self.box_regression(image, rnet_candis)
         return rnet_candis
 
-    def run_onet(self, models, image, candis):
+    def run_onet(self, models, image, candis, size=48):
+        if not candis:
+            return []
         feedbox = []
         for elm in candis:
             rx1, ry1, rx2, ry2 = elm[:4]
@@ -133,10 +137,10 @@ class Detector(object):
             if mask_prob[idx] < self.threshold[2]:
                  continue
             rx1, ry1, rx2, ry2 = map(int, elm[:4])
-            reg_rx1 = int(rx1 * reg_box[idx][0])
-            reg_ry1 = int(ry1 * reg_box[idx][1])
-            reg_rx2 = int(rx2 * reg_box[idx][2])
-            reg_ry2 = int(ry2 * reg_box[idx][3])
+            reg_rx1 = int(size * reg_box[idx][0])
+            reg_ry1 = int(size * reg_box[idx][1])
+            reg_rx2 = int(size * reg_box[idx][2])
+            reg_ry2 = int(size * reg_box[idx][3])
 
             onet_candis.append([rx1, ry1, rx2, ry2, reg_rx1, reg_ry1, reg_rx2, reg_ry2, mask_prob[idx]])
         onet_candis = NMS(onet_candis, 0.4, "min")

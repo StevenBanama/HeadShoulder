@@ -25,7 +25,7 @@ def video(params=None):
 
     while True:
         ret, img = cap.read()
-        if not ret:
+        if not ret or len(img.shape) != 3:
             continue
         img = cv2.resize(img, (640, 480))
         (height, width) = img.shape[:-1]
