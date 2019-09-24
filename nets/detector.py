@@ -12,10 +12,10 @@ class Detector(object):
     def __init__(self):
         self.stride = 2  # search stride
         self.models = {}  # model path
-        self.scale_factor = 0.709  # image search scale
+        self.scale_factor = 0.809  # image search scale
         self.min_size = 12
-        self.min_box = 48
-        self.threshold = [0.65, 0.8, 0.97]
+        self.min_box = 24
+        self.threshold = [0.7, 0.8, 0.97]
         self.input_size = (640, 480, 3)
         self.init_net()
 
@@ -42,7 +42,7 @@ class Detector(object):
         while height * scale >= self.min_size and width * scale >= self.min_size:
             h, w = int(height * scale), int(width * scale)
             scale_img = cv2.resize(image, (w, h))
-            probs, reg_box, reg_point = models.predict(np.array([scale_img]))
+            probs, reg_box, reg_point = models.predict(np.array([scale_img]), batch_size=1)
             probs = probs[:, :, :, 1]
             boxes = self.selection(image, probs[0], reg_box[0], scale, size)
             nms_boxes = NMS(boxes, 0.5, "union")
