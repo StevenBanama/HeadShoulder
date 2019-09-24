@@ -13,7 +13,8 @@ class Detector(object):
         self.stride = 2  # search stride
         self.models = {}  # model path
         self.scale_factor = 0.709  # image search scale
-        self.min_size = 24
+        self.min_size = 12
+        self.min_box = 48
         self.threshold = [0.65, 0.8, 0.97]
         self.input_size = (640, 480, 3)
         self.init_net()
@@ -68,7 +69,7 @@ class Detector(object):
                 rx2 = rx2 + square_size / 2 - w / 2
                 ry1 = ry1 + square_size / 2 - h / 2
                 ry2 = ry2 + square_size / 2 - h / 2
-                if min(ry2 - ry1, rx2 - rx1) < self.min_size:
+                if min(ry2 - ry1, rx2 - rx1) < self.min_box:
                     continue
 
 
