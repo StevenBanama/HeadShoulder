@@ -6,6 +6,7 @@ import tensorflow as tf
 from keras.activations import softmax, sigmoid
 from keras.engine.input_layer import Input
 from net import BuildModel
+from detector import Detector 
 
 def gen_input(image, size=12, stride=12):
     input = []
@@ -15,12 +16,31 @@ def gen_input(image, size=12, stride=12):
             input.append(image[x:x+size, y:y+size,:])
     return np.array(input)
 
+def video(params=None):
+    cap = cv2.VideoCapture(0)
+    det = Detector()
+
+    while True:
+        ret, img = cap.read()
+        if not ret:
+            continue
+        img = cv2.resize(img, (640, 480))
+        (height, width) = img.shape[:-1]
+
+        det.predict(img)
+
+        if img is not None:
+            cv2.imshow("result", img)
+        if cv2.waitKey(3) == 27:
+            break
+
+
 def run_detect():
-    from detector import Detector 
     img = cv2.imread("./assets/timg4.jpg")
     print(img)
     det = Detector()
     det.predict(img)
 
 if __name__ == "__main__":
-    run_detect()
+    #run_detect()
+    video()

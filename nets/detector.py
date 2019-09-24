@@ -13,8 +13,8 @@ class Detector(object):
         self.stride = 2  # search stride
         self.models = {}  # model path
         self.scale_factor = 0.709  # image search scale
-        self.min_size = 12
-        self.threshold = [0.65, 0.7, 0.97]
+        self.min_size = 24
+        self.threshold = [0.65, 0.8, 0.97]
         self.input_size = (640, 480, 3)
         self.init_net()
 
@@ -68,6 +68,9 @@ class Detector(object):
                 rx2 = rx2 + square_size / 2 - w / 2
                 ry1 = ry1 + square_size / 2 - h / 2
                 ry2 = ry2 + square_size / 2 - h / 2
+                if min(ry2 - ry1, rx2 - rx1) < self.min_size:
+                    continue
+
 
             result.append([rx1, ry1, rx2, ry2, 0, 0, 0, 0, prob])
         return result
@@ -126,7 +129,7 @@ class Detector(object):
         reg_box = onet_candis[1]
         onet_candis = []
         for idx, elm in enumerate(candis):
-            if mask_prob[idx] < self.threshold[1]:
+            if mask_prob[idx] < self.threshold[2]:
                  continue
             rx1, ry1, rx2, ry2 = map(int, elm[:4])
             reg_rx1 = int(rx1 * reg_box[idx][0])
@@ -136,11 +139,9 @@ class Detector(object):
 
             onet_candis.append([rx1, ry1, rx2, ry2, reg_rx1, reg_ry1, reg_rx2, reg_ry2, mask_prob[idx]])
         onet_candis = NMS(onet_candis, 0.4, "min")
-        '''
         for elm in onet_candis:
             rx1, ry1, rx2, ry2 = elm[:4]
             cv2.rectangle(image, (rx1, ry1), (rx2, ry2), (0, 255, 0), 2)
-        cv2.imwrite("test_pri.jpg", image)
-        '''
+        #cv2.imwrite("test_pri.jpg", image)
         print(onet_candis)
         return onet_candis

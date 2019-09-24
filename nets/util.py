@@ -2,10 +2,14 @@
 import os
 import re
 import cv2
+import sys
+from os.path import dirname
+sys.path.append(dirname(dirname(__file__)))
+
 import numpy as np
 import pandas as pd
 import random
-from preprocess.Pnet_process import Btype
+from preprocess.image_process import Btype
 from sklearn.utils import shuffle
 from keras.backend import categorical_crossentropy
 import keras.backend as K
