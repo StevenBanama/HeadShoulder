@@ -181,7 +181,10 @@ def generate_data_generator(dataframe, input_size=12, batch_size=32, is_training
             imgs, concat_data = result[:,0], result[:,1]
             imgs = np.array(imgs.tolist())
             concat_data = np.array(concat_data.tolist())
-            yield imgs, [concat_data, concat_data, concat_data]
+            if input_size == 12:
+                yield imgs, [concat_data, concat_data]
+            else:
+                yield imgs, [concat_data, concat_data, concat_data]
             start += batch_size
 
 def gen_input(image, size=12, stride=12):

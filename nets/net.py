@@ -30,8 +30,8 @@ def propose_net(input):
     block3 = PReLU(shared_axes=[1, 2])(Conv2D(32, (3, 3), padding="valid", strides=(1, 1), name="conv3")(block2))
     cate = Conv2D(2, (1, 1), activation="softmax", name="class")(block3)
     boxes = Conv2D(4, (1, 1), name="box")(block3)
-    landmark = Conv2D(14, (1, 1), name="landmark")(block3)
-    model = Model(input=input, output=[cate, boxes, landmark])
+    #landmark = Conv2D(14, (1, 1), name="landmark")(block3)
+    model = Model(input=input, output=[cate, boxes])
     return model
 
 def recall_net(input):
@@ -80,22 +80,23 @@ def BuildModel(ntype, lr=0.002, pretrain_path=None, is_train=False):
         if ntype == "pnet":
            input = Input(shape=[12, 12, 3] if is_train else [None, None, 3])
            model = propose_net(input)
-           alpha_det, alpha_box, alpha_landmk = 1, 0.5, 0.5
-    
+           loss_weight = alpha_det, alpha_box = [1, 0.5]
+           loss_func = [cls_ohem, bbox_ohem]
         elif ntype == "rnet":
            model = recall_net(Input(shape=(24, 24, 3)))
-           alpha_det, alpha_box, alpha_landmk = 1, 0.5, 0.5
+           loss_weight = alpha_det, alpha_box, alpha_landmk = [1, 0.5, 0.5]
+           loss_func = [cls_ohem, bbox_ohem, landmark_ohem]
         elif ntype == "onet":
            model = output_net(Input(shape=(48, 48, 3)))
-           alpha_det, alpha_box, alpha_landmk = 1, 0.5, 1
-    
+           loss_weight = alpha_det, alpha_box, alpha_landmk = [1, 0.5, 1]
+           loss_func = [cls_ohem, bbox_ohem, landmark_ohem] 
         else:
            raise Exception("invalid net")
     
         model.summary()
         model.compile(optimizer=Adam(lr=lr),
-            loss=[cls_ohem, bbox_ohem, landmark_ohem],
-            loss_weights=[alpha_det, alpha_box, alpha_landmk],
+            loss=loss_func,
+            loss_weights=loss_weight,
             metrics={"class": accuracy}
         )
         if pretrain_path and os.path.exists(pretrain_path):
