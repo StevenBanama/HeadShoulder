@@ -5,6 +5,7 @@ import numpy as np
 from net import BuildModel
 from util import gen_input, NMS
 import keras.backend as K
+import tensorflow as tf
 
 
 class Detector(object):
@@ -34,6 +35,27 @@ class Detector(object):
         with self.ograph.as_default():
             with self.osess.as_default():
                 onet_candis = self.run_onet(self.models["onet"], cv_img, rnet_candis)
+
+    def save_as_pb(self, outdir="./models/"):
+        from tensorflow.python.framework.graph_util import convert_variables_to_constants
+        model_name = "pnet.pb"
+        for key in self.models:
+            model = self.models[key]
+            model_name = key + ".pb"
+            if key == "pnet":
+                graph, sess = self.pgraph, self.psess
+            elif key == "rnet":
+                graph, sess = self.rgraph, self.rsess
+            elif key == "onet":
+                graph, sess = self.ograph, self.osess
+            with graph.as_default():
+                with sess.as_default():
+                    print(key, model.input)
+                    out_names = [v.name.split(":")[0] for v in model.output]
+                    node_names = out_names
+                    print(node_names)
+                    frozon_graph = convert_variables_to_constants(sess, graph.as_graph_def(), node_names)
+                    tf.train.write_graph(frozon_graph, outdir, model_name, as_text=False)
 
     def run_pnet(self, models, image, size=12):
         height, width = image.shape[:2]
