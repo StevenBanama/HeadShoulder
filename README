@@ -1,0 +1,22 @@
+# Head and Shoulder Detection Base on MTCNN
+
+use coco dataset to detect head and shoulder. This implements is base on MTCNN
+
+## prepare
+- download coco keypoints dataset 
+- python preprocess/coco.py --data-dir {your coco dataset } --anotation {anotation} -o {coco.feather}  #  collect keypoints and gen boundbox
+- python preprocess/image_process.py -n {pnet,rnet,onet} --preprocess-path  {./data/coco.feather}  # gen data for one stage
+
+## train
+  train pnet
+   >> python nets/net.py -n pnet -lr 0.002 -w 2
+  train rnet
+   >> python nets/net.py -n rnet -lr 0.002 -w 2
+  train onet
+   >> python nets/net.py -n onet -lr 0.002 -w 2
+
+## test 
+   >> python nets/test.py 
+
+# reference
+  >> to do 

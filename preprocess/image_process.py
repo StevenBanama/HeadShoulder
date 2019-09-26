@@ -134,7 +134,7 @@ def init_parse():
         help='pnet|rnet|onet')
     parser.add_argument(
         '-p', '--preprocess-path',
-        default="./preprocess/test.feather", type=str,
+        default="./data/test.feather", type=str,
         help='candi dataset path')
     parser.add_argument(
         '-w', '--workers',

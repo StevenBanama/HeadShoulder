@@ -48,7 +48,7 @@ def key_points_filter(image, an, points):
          return False
     return True
 
-def init_coco(img_path, key_point_anno):
+def init_coco(img_path, key_point_anno, output):
     coco = COCO(key_point_anno)
     catIds = coco.getCatIds(catNms=['person']);
     ca = coco.loadCats(catIds)
@@ -89,10 +89,31 @@ def init_coco(img_path, key_point_anno):
 
         #cv2.imwrite(img_meta['file_name'], image)
     pd_result = pd.DataFrame(result)
-    pd_result.to_feather("test.feather")
+    pd_result.to_feather(output)
+
+def init_parse():
+    import argparse
+    parser = argparse.ArgumentParser(
+        description='mtcnn test')
+    parser.add_argument(
+        '-d', '--data-dir', default="/data/build/dataset/coco/train2017/",
+        type=str, help='the dirname of trainning data')
+    parser.add_argument(
+        '-ano', '--anotation',
+        default="/data/build/dataset/coco/anotation/person_keypoints_train2017.json",
+        type=str,
+        help='candi dataset path')
+    parser.add_argument(
+        '-o', '--output',
+        default="./data/test.feather", type=str,
+        help='head and should points')
+
+    params = parser.parse_args()
+    return params
 
 if __name__ == "__main__":
-    img_path = '/data/build/dataset/coco/train2017/'
-    key_point_anno = "/data/build/dataset/coco/anotation/person_keypoints_train2017.json"
-
-    init_coco(img_path, key_point_anno)
+    params = init_parse()
+    img_path = params.data_dir
+    key_point_anno = params.anotation
+    output = params.output
+    init_coco(img_path, key_point_anno, output)
