@@ -21,9 +21,9 @@ class Detector(object):
         self.init_net()
 
     def init_net(self):
-        self.models["pnet"], self.pgraph, self.psess, _, _ = BuildModel("pnet", pretrain_path="./models/pnet.h5")
-        self.models["rnet"], self.rgraph, self.rsess, _, _ = BuildModel("rnet", pretrain_path="./models/rnet.h5")
-        self.models["onet"], self.ograph, self.osess, _, _ = BuildModel("onet", pretrain_path="./models/onet.h5")
+        self.models["pnet"], self.pgraph, self.psess = BuildModel("pnet", pretrain_path="./models/pnet.h5")
+        self.models["rnet"], self.rgraph, self.rsess = BuildModel("rnet", pretrain_path="./models/rnet.h5")
+        self.models["onet"], self.ograph, self.osess = BuildModel("onet", pretrain_path="./models/onet.h5")
 
     def predict(self, cv_img):
         with self.pgraph.as_default():
@@ -169,6 +169,6 @@ class Detector(object):
         for elm in onet_candis:
             rx1, ry1, rx2, ry2 = elm[:4]
             cv2.rectangle(image, (rx1, ry1), (rx2, ry2), (0, 255, 0), 2)
-        #cv2.imwrite("test_pri.jpg", image)
+        cv2.imwrite("test_pri.jpg", image)
         print(onet_candis)
         return onet_candis
