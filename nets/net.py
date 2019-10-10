@@ -92,7 +92,7 @@ def BuildModel(ntype, lr=0.002, pretrain_path=None, is_train=False):
         model.summary()
         if pretrain_path and os.path.exists(pretrain_path):
             print("!!!! restore path: %s"%pretrain_path)
-            model.load_weights(pretrain_path, by_name=True)
+            model.load_weights(pretrain_path, by_name=is_train)
     return model, graph, session
 
 def gen_traning_params(ntype):

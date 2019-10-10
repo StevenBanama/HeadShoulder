@@ -13,10 +13,10 @@ class Detector(object):
     def __init__(self):
         self.stride = 2  # search stride
         self.models = {}  # model path
-        self.scale_factor = 0.809  # image search scale
+        self.scale_factor = 0.709  # image search scale
         self.min_size = 12
         self.min_box = 24
-        self.threshold = [0.7, 0.8, 0.95]
+        self.threshold = [0.7, 0.8, 0.99]
         self.input_size = (640, 480, 3)
         self.init_net()
 
@@ -24,6 +24,7 @@ class Detector(object):
         self.models["pnet"], self.pgraph, self.psess = BuildModel("pnet", pretrain_path="./models/pnet.h5")
         self.models["rnet"], self.rgraph, self.rsess = BuildModel("rnet", pretrain_path="./models/rnet.h5")
         self.models["onet"], self.ograph, self.osess = BuildModel("onet", pretrain_path="./models/onet.h5")
+        #self.save_as_pb()
 
     def predict(self, cv_img):
         with self.pgraph.as_default():
