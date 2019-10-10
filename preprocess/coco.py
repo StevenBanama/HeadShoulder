@@ -21,7 +21,7 @@ def key_points_filter(image, an, points):
     if an["keypoints"][3*6+1] != 0 and an["keypoints"][3*4+1] != 0 and an["keypoints"][3*6+1] < an["keypoints"][3*4+1]:
         return False
     # get only 7 keypoints
-    for x in xrange(7): # max point 17
+    for x in range(7): # max point 17
         if an["keypoints"][3*x+2] >= 1:
             if an["keypoints"][3*x+0] == 0:
                 continue
@@ -35,10 +35,10 @@ def key_points_filter(image, an, points):
     if width > 0 and (height / width) > 3:
         return False
 
-    for x in xrange(len(an["segmentation"])):
+    for x in range(len(an["segmentation"])):
         segmentation = an["segmentation"][x]
         if segmentation:
-            for y in xrange(len(segmentation)//2):
+            for y in range(len(segmentation)//2):
                 #image = cv2.circle(image,(int(segmentation[2*y+0]), int(segmentation[2*y+1])), 1, (0,0,213), -1)
                 if points and len(points) >= 3:  # 关键点必须超过三个
                     if segmentation[2*y+1] < ymax and xmax + 0.5 *(xmax-xmin) > segmentation[2*y] > xmin - 0.5 *(xmax-xmin):

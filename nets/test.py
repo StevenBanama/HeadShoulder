@@ -11,8 +11,8 @@ from detector import Detector
 def gen_input(image, size=12, stride=12):
     input = []
     height, width = image.shape[:2]
-    for x in xrange(0, height - size, stride):
-        for y in xrange(0, width - size, stride):
+    for x in range(0, height - size, stride):
+        for y in range(0, width - size, stride):
             input.append(image[x:x+size, y:y+size,:])
     return np.array(input)
 
@@ -45,5 +45,5 @@ def run_detect():
     det.predict(img)
 
 if __name__ == "__main__":
-    #run_detect()
-    video()
+    run_detect()
+    #video()

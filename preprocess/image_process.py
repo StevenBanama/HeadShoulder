@@ -1,9 +1,9 @@
 #coding=utf-8
 import cv2
+import time
 import pandas as pd
 import numpy as np
-from utils import IOU
-import time
+from .utils import IOU
 
 COLUMNS = ["file_name", "cropped", "norm_points", "normbox", "btype", "crop_image"]
 
@@ -17,8 +17,8 @@ def process(dataframe, input_size=12, output_file="pnet.feather"):
  
     for idx, ano in dataframe.iterrows():
         img_path = ano.file_name
-        gboxes = np.loads(ano.boundbox)
-        keypoint = np.loads(ano.keypoints)
+        gboxes = np.loads(ano.boundbox, encoding='bytes')
+        keypoint = np.loads(ano.keypoints, encoding='bytes')
 
         img = cv2.imread(img_path)
         height, width = img.shape[:-1]
@@ -60,7 +60,7 @@ def gen_from_ground_truth(path, img, gt_boxes, keypoints, input_size=12, neg_num
         x1, y1, x2, y2 = gt_box
         w, h = x2 - x1, y2 - y1
         nums = 5
-        for x in xrange(nums):
+        for x in range(nums):
             size = np.random.randint(12, min(width, height) / 2)
             # delta_x and delta_y are offsets of (x1, y1)
             delta_x = np.random.randint(max(-size, -x1), w)
@@ -157,7 +157,7 @@ def main():
        size = 24
     elif net == "onet":
        size = 48
-    #process(dataframe, size, "./data/pnet_1.feather")
+    process(dataframe, size, "./data/pnet_1.feather")
     pool = Pool(params.workers)
     print(dataframe.size)
     for g, df in dataframe.groupby(np.arange(len(dataframe)) // 2000):

@@ -21,9 +21,9 @@ class Detector(object):
         self.init_net()
 
     def init_net(self):
-        self.models["pnet"], self.pgraph, self.psess = BuildModel("pnet", pretrain_path="./models/pnet.h5")
-        self.models["rnet"], self.rgraph, self.rsess = BuildModel("rnet", pretrain_path="./models/rnet.h5")
-        self.models["onet"], self.ograph, self.osess = BuildModel("onet", pretrain_path="./models/onet.h5")
+        self.models["pnet"], self.pgraph, self.psess, _, _ = BuildModel("pnet", pretrain_path="./models/pnet.h5")
+        self.models["rnet"], self.rgraph, self.rsess, _, _ = BuildModel("rnet", pretrain_path="./models/rnet.h5")
+        self.models["onet"], self.ograph, self.osess, _, _ = BuildModel("onet", pretrain_path="./models/onet.h5")
 
     def predict(self, cv_img):
         with self.pgraph.as_default():
@@ -64,7 +64,7 @@ class Detector(object):
         while height * scale >= self.min_size and width * scale >= self.min_size:
             h, w = int(height * scale), int(width * scale)
             scale_img = cv2.resize(image, (w, h))
-            probs, reg_box, reg_point = models.predict(np.array([scale_img]), batch_size=1)
+            probs, reg_box = models.predict(np.array([scale_img]), batch_size=1)
             probs = probs[:, :, :, 1]
             boxes = self.selection(image, probs[0], reg_box[0], scale, size)
             nms_boxes = NMS(boxes, 0.5, "union")
@@ -101,8 +101,8 @@ class Detector(object):
     def selection(self, image, probs, boxes_reg, scale, size=12):
         candis = []
         h, w = probs.shape
-        for c in xrange(w):
-            for r in xrange(h):
+        for c in range(w):
+            for r in range(h):
                 if probs[r][c] > self.threshold[0]:
                     reg_box = reg_x1, reg_y1, reg_x2, reg_y2 = boxes_reg[r][c]
                     rx1 = int((c * self.stride) / scale)

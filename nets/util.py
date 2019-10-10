@@ -9,11 +9,14 @@ sys.path.append(dirname(dirname(__file__)))
 import numpy as np
 import pandas as pd
 import random
+import keras
+from tensorflow.python.keras import backend as K
+import tensorflow as tf
+
+from sys import version_info
 from preprocess.image_process import Btype
 from sklearn.utils import shuffle
-from keras.backend import categorical_crossentropy
-import keras.backend as K
-import tensorflow as tf
+from tensorflow.python.keras.backend import categorical_crossentropy
 
 # Joint Face Detection and Alignment using Multi-task Cascaded Convolutional Networks
 # total loss = \sum_{i=0}^N \sum_{j \in \{\ det, box, landmark }} \alpha_j * \beta_i^j * L_i^j
@@ -48,8 +51,8 @@ def bbox_ohem(package_data, p_box, top=0.7):
     mask = tf.reshape(tf.equal(g_class, Btype.PART) | tf.equal(g_class, Btype.POSITIVE), [-1])
     nums = tf.cast(tf.reduce_sum(tf.cast(mask, tf.float32)) * top, tf.int32)
 
-    gbound = tf.gather(g_class, indices=[x for x in xrange(1, 5)], axis=-1)
-    gpoints = tf.gather(g_class, indices=[x for x in xrange(5, 19)], axis=-1)
+    gbound = tf.gather(package_data, indices=[x for x in range(1, 5)], axis=-1)
+    gpoints = tf.gather(package_data, indices=[x for x in range(5, 19)], axis=-1)
     values, _ = tf.nn.top_k(tf.reduce_mean(tf.abs(gbound - p_box), axis=-1), nums)
     return tf.reduce_mean(values)
 
@@ -63,15 +66,14 @@ def landmark_ohem(package_data, ppoint, top=0.7):
     mask = tf.reshape(tf.equal(g_class, Btype.POSITIVE), [-1])
     nums = tf.cast(tf.reduce_sum(tf.cast(mask, tf.float32)) * top, tf.int32)
 
-    gbound = tf.gather(g_class, indices=[x for x in xrange(1, 5)], axis=-1)
-    gpoints = tf.gather(g_class, indices=[x for x in xrange(5, 19)], axis=-1)
+    gbound = tf.gather(package_data, indices=[x for x in range(1, 5)], axis=-1)
+    gpoints = tf.gather(package_data, indices=[x for x in range(5, 19)], axis=-1)
     gp_mask = tf.cast(tf.equal(gpoints, 0), tf.float32)  # keypoints of ground truth is 0 which means hidden
     values, _ = tf.nn.top_k(tf.reduce_mean(tf.abs(gpoints - ppoint) * gp_mask, axis=-1), nums)
     return tf.reduce_mean(values)
 
 def accuracy(package_data, p_class):
     from keras.metrics import categorical_accuracy
-    print("dddddd", p_class.get_shape())
     g_class = tf.gather(package_data, indices=[0], axis=-1)
     mask = tf.reshape(tf.equal(g_class, Btype.NEG) | tf.equal(g_class, Btype.POSITIVE), [-1])
     p_class = tf.boolean_mask(p_class, mask)
@@ -148,11 +150,11 @@ def image_enforcing(img, norm_box, norm_keypoints, contrast=(0.5, 2.5), bright=(
 
 def image_transform(idx, row, input_size=12, is_training=True):
     if row.crop_image:
-        input_img = np.loads(row.crop_image)
+        input_img = np.loads(row.crop_image, encoding='bytes') if version_info.major >=3 else np.loads(row.crop_image)
     else:
         img = cv2.imread(row.file_name)
-        cropped = np.loads(row.cropped)
-        x1, y1, x2, y2 = map(int, cropped.tolist())
+        cropped = np.loads(row.cropped, encoding='bytes')
+        x1, y1, x2, y2 = [int(x) for x in cropped.tolist()]
         input_img = cv2.resize(img[y1:y2, x1:x2, :], (input_size, input_size,))
     btype, normbox, norm_points = row.btype, trans_numpy(row.normbox), trans_numpy(row.norm_points)
     btype = np.array([btype])
@@ -167,7 +169,7 @@ def image_transform(idx, row, input_size=12, is_training=True):
     return input_img, result
 
 def trans_numpy(data):
-    return np.loads(data)
+    return np.loads(data, encoding='bytes') if version_info.major >= 3 else np.loads(data)
 
 def generate_data_generator(dataframe, input_size=12, batch_size=32, is_training=True):
     dataframe = dataframe.reset_index(drop=True)
@@ -177,7 +179,7 @@ def generate_data_generator(dataframe, input_size=12, batch_size=32, is_training
         start = 0
         while start + batch_size < all_nums:
             candis = dataframe.loc[list(idxs[start:start+batch_size])]
-            result = np.array(map(lambda x: image_transform(*x, is_training=is_training, input_size=input_size), candis.iterrows()))
+            result = np.array([image_transform(*x, is_training=is_training, input_size=input_size) for x in candis.iterrows()])
             imgs, concat_data = result[:,0], result[:,1]
             imgs = np.array(imgs.tolist())
             concat_data = np.array(concat_data.tolist())
@@ -187,11 +189,39 @@ def generate_data_generator(dataframe, input_size=12, batch_size=32, is_training
                 yield imgs, [concat_data, concat_data, concat_data]
             start += batch_size
 
+class DataGenetator(tf.keras.utils.Sequence):
+
+    def __init__(self, dataframe, input_size=12, batch_size=32, is_training=True):
+        self.dataframe = dataframe
+        self.batch_size = batch_size
+        self.input_size = input_size
+        self.is_training = is_training
+
+    def __len__(self):
+        return int(np.ceil(len(self.dataframe) / float(self.batch_size)))
+
+    def __getitem__(self, idx):
+        start = idx * self.batch_size
+        candis = self.dataframe[start:start + self.batch_size]
+        result = np.array([image_transform(*x, is_training=self.is_training, input_size=self.input_size) for x in candis.iterrows()])
+        imgs, concat_data = result[:,0], result[:,1]
+        imgs = np.array(imgs.tolist())
+        concat_data = np.array(concat_data.tolist())
+        if self.input_size == 12:
+            return imgs, [concat_data, concat_data]
+        else:
+            return imgs, [concat_data, concat_data, concat_data]
+
+    def on_epoch_end(self):
+        idxes = np.random.permutation(len(self.dataframe))
+        self.dataframe = self.dataframe.take(idxes).reset_index(drop=True)
+
+
 def gen_input(image, size=12, stride=12):
     input = []
     height, width = image.shape[:2]
-    for y in xrange(0, height - size, stride):
-        for x in xrange(0, width - size, stride):
+    for y in range(0, height - size, stride):
+        for x in range(0, width - size, stride):
             input.append(image[y:y+size, x:x+size:])
     return np.array(input)
 
@@ -224,3 +254,5 @@ if __name__ == "__main__":
     dataframe = load_data("./data/")
     gr = generate_data_generator(dataframe)
     print(next(gr)[1][0][:,0])
+    dd = DataGenetator(dataframe, )
+    print(dd[1])
