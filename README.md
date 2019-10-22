@@ -10,15 +10,15 @@ Pretrain model has been placed in models.
 
 ## train
   train pnet
-   >> python nets/net.py -n pnet -lr 0.002 -w 2
+>> python nets/net.py -n pnet -lr 0.002 -w 2
   train rnet
-   >> python nets/net.py -n rnet -lr 0.002 -w 2
+>> python nets/net.py -n rnet -lr 0.002 -w 2
   train onet
-   >> python nets/net.py -n onet -lr 0.002 -w 2
+>> python nets/net.py -n onet -lr 0.002 -w 2
 
 ## hard mining
-   python preprocess/hard_mining.py -n rnet
-   python preprocess/hard_mining.py -n onet
+>> python preprocess/hard_mining.py -n rnet
+>> python preprocess/hard_mining.py -n onet
 
 ## test 
    >> python nets/test.py -p video 
@@ -33,6 +33,6 @@ Pretrain model has been placed in models.
 
 current result
 
-| |pnet|rnet|onet|
+| metric|pnet|rnet|onet|
 |-|-|-|-|
-| |94%|96.1%|98.5%|
+| acc |94%|96.1%|98.5%|
