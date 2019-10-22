@@ -134,7 +134,7 @@ def init_parse():
         help='pnet|rnet|onet')
     parser.add_argument(
         '-p', '--preprocess-path',
-        default="./data/test.feather", type=str,
+        default="./data/train_data.feather", type=str,
         help='candi dataset path')
     parser.add_argument(
         '-w', '--workers',
@@ -157,7 +157,6 @@ def main():
        size = 24
     elif net == "onet":
        size = 48
-    process(dataframe, size, "./data/pnet_1.feather")
     pool = Pool(params.workers)
     print(dataframe.size)
     for g, df in dataframe.groupby(np.arange(len(dataframe)) // 2000):

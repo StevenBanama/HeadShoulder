@@ -2,6 +2,7 @@
 import os
 import numpy as np
 import tensorflow as tf
+from sys import version_info
 from tensorflow.python import keras
 from tensorflow.python.keras import backend as K
 from tensorflow.python.keras.activations import softmax, sigmoid
@@ -14,8 +15,8 @@ from tensorflow.python.keras.models import Model, load_model
 from tensorflow.python.keras.optimizers import Adam
 from tensorflow.python.keras import regularizers
 from sklearn.model_selection import train_test_split
-from util import cls_ohem, bbox_ohem, landmark_ohem, load_data, generate_data_generator, accuracy, DataGenetator
 from tensorflow.python.keras.callbacks import ModelCheckpoint, TensorBoard, EarlyStopping, LearningRateScheduler, ReduceLROnPlateau, LambdaCallback
+from util import cls_ohem, bbox_ohem, landmark_ohem, load_data, generate_data_generator, accuracy, DataGenetator
 
 
 def Squeeze(input):
@@ -101,11 +102,11 @@ def gen_traning_params(ntype):
         loss_func = [cls_ohem, bbox_ohem]
         input_size = 12
     elif ntype == "rnet":
-        loss_weight = alpha_det, alpha_box, alpha_landmk = [1, 0.5, 0.5]
+        loss_weight = alpha_det, alpha_box, alpha_landmk = [1, 0.5, 0.01]
         loss_func = [cls_ohem, bbox_ohem, landmark_ohem]
         input_size = 24
     elif ntype == "onet":
-        loss_weight = alpha_det, alpha_box, alpha_landmk = [1, 0.5, 1]
+        loss_weight = alpha_det, alpha_box, alpha_landmk = [1, 0.5, 0.1]
         loss_func = [cls_ohem, bbox_ohem, landmark_ohem] 
         input_size = 48
     else:
@@ -224,7 +225,7 @@ def train(params):
 
    dataframe = load_data("./data/", ptn=params.net)
    trainset, testset = train_test_split(dataframe, train_size=sample_rate, test_size=1-sample_rate, random_state=seed)
-   
+   print(trainset.shape, testset.shape) 
 
    train_gen = DataGenetator(trainset, input_size=input_size, batch_size=batch_size)
    validation_gen = DataGenetator(testset, input_size=input_size, batch_size=batch_size, is_training=False)
@@ -233,7 +234,7 @@ def train(params):
            workers=params.worker, use_multiprocessing=(params.worker > 1),
            steps_per_epoch=len(trainset) / batch_size, epochs=80,
            callbacks=callbacks, validation_data=validation_gen,
-           validation_steps=len(testset) / batch_size * 3)
+           validation_steps=len(testset) / batch_size)
 
 if __name__ == "__main__":
     params = init_parse()

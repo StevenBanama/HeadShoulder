@@ -16,7 +16,7 @@ class Detector(object):
         self.scale_factor = 0.709  # image search scale
         self.min_size = 12
         self.min_box = 24
-        self.threshold = [0.7, 0.8, 0.99]
+        self.threshold = [0.7, 0.9, 0.9]
         self.input_size = (640, 480, 3)
         self.init_net()
 
@@ -24,15 +24,19 @@ class Detector(object):
         self.models["pnet"], self.pgraph, self.psess = BuildModel("pnet", pretrain_path="./models/pnet.h5")
         self.models["rnet"], self.rgraph, self.rsess = BuildModel("rnet", pretrain_path="./models/rnet.h5")
         self.models["onet"], self.ograph, self.osess = BuildModel("onet", pretrain_path="./models/onet.h5")
-        #self.save_as_pb()
+        # self.save_as_pb()
 
-    def predict(self, cv_img):
+    def predict(self, cv_img, stage="onet"):
         with self.pgraph.as_default():
             with self.psess.as_default():
                 candis = self.run_pnet(self.models["pnet"], cv_img)
+                if stage == "pnet":
+                    return candis
         with self.rgraph.as_default():
             with self.rsess.as_default():
                 rnet_candis = self.run_rnet(self.models["rnet"], cv_img, candis)
+                if stage == "rnet":
+                    return rnet_candis
         with self.ograph.as_default():
             with self.osess.as_default():
                 onet_candis = self.run_onet(self.models["onet"], cv_img, rnet_candis)
@@ -51,10 +55,8 @@ class Detector(object):
                 graph, sess = self.ograph, self.osess
             with graph.as_default():
                 with sess.as_default():
-                    print(key, model.input)
                     out_names = [v.name.split(":")[0] for v in model.output]
                     node_names = out_names
-                    print(node_names)
                     frozon_graph = convert_variables_to_constants(sess, graph.as_graph_def(), node_names)
                     tf.train.write_graph(frozon_graph, outdir, model_name, as_text=False)
 
@@ -123,8 +125,8 @@ class Detector(object):
             return []
         feedbox = []
         for elm in candis:
-            rx1, ry1, rx2, ry2 = elm[:4]
-            feedbox.append(cv2.resize(image[ry1:ry2+1, rx1:rx2+1,:], (24, 24)))
+            rx1, ry1, rx2, ry2 = list(map(int, elm[:4]))
+            feedbox.append(cv2.resize(image[max(ry1, 0):ry2+1, max(rx1, 0):rx2+1,:], (24, 24)))
         rnet_candis = models.predict(np.array(feedbox))
         mask = rnet_candis[0][:, 1] > self.threshold[1]
         mask_prob = rnet_candis[0][:, 1]
@@ -148,13 +150,14 @@ class Detector(object):
             return []
         feedbox = []
         for elm in candis:
-            rx1, ry1, rx2, ry2 = elm[:4]
-            feedbox.append(cv2.resize(image[ry1:ry2+1, rx1:rx2+1,:], (48, 48)))
+            rx1, ry1, rx2, ry2 = list(map(int, elm[:4]))
+            feedbox.append(cv2.resize(image[max(ry1, 0):ry2+1, max(rx1, 0):rx2+1,:], (48, 48)))
 
         onet_candis = models.predict(np.array(feedbox))
         mask_prob = onet_candis[0][:, 1]
         candis = np.array(candis)
         reg_box = onet_candis[1]
+        key_points = onet_candis[2]
         onet_candis = []
         for idx, elm in enumerate(candis):
             if mask_prob[idx] < self.threshold[2]:
@@ -170,6 +173,5 @@ class Detector(object):
         for elm in onet_candis:
             rx1, ry1, rx2, ry2 = elm[:4]
             cv2.rectangle(image, (rx1, ry1), (rx2, ry2), (0, 255, 0), 2)
-        cv2.imwrite("test_pri.jpg", image)
-        print(onet_candis)
+        # cv2.imwrite("test_pri.jpg", image)
         return onet_candis

@@ -17,3 +17,5 @@ use coco dataset to detect head and shoulder. This implements is base on MTCNN
 
 ## test 
    >> python nets/test.py 
+
+r: 96.1%  o: 98.5%

@@ -227,7 +227,7 @@ def gen_input(image, size=12, stride=12):
 
 def NMS(boxes, thres=0.5, ntype="union"):
     # boxes: [[x, y, x2, y2, prob]...]
-    boxes = sorted(boxes, cmp=lambda x, y: -cmp(x[-1], y[-1]))
+    boxes = sorted(boxes, key=lambda x:x[-1], reverse=True)
     output = []
     for b in boxes:
         keep = True
