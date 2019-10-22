@@ -44,6 +44,25 @@ def run_detect():
     det = Detector()
     det.predict(img)
 
+def init_parse():
+    import argparse
+    parser = argparse.ArgumentParser(
+        description='mtcnn shoulder detector')
+    parser.add_argument(
+        '-p', '--ptn', default="video", type=str,
+        choices=['video', "one", 'save_pb'],
+        help='video|one|save_pb')
+    return parser.parse_args()
+
+def save_pb():
+    det = Detector()
+    det.save_as_pb()
+
 if __name__ == "__main__":
-    run_detect()
-    #video()
+    params = init_parse()
+    if params.ptn == "video":
+        video()
+    elif params.ptn == "one":
+        run_detect()
+    else:
+        save_pb() 
