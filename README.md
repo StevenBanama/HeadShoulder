@@ -24,12 +24,12 @@ Pretrain model has been placed in models.
    >> python nets/test.py -p video 
 
 ## Warning
-   - Prediction is much more slower than expect in keras, but predict it on arm-rk3399, it only cost about 100ms totally.(python is really slow)
+   - Prediction is much more slower than expected in keras, but when predicts it on arm-rk3399, it only cost about 100ms totally.(python is really slow)
    - how to import the performace
-       1.batch norm
-       2.change the prediction of bound box, taking consideration of yolo v2/3.
-       3.cleaning data (it`s really important!!!!!. Our generator scripts exist a lot of noisy) 
-       4: pruning model
+       - batch norm
+       - change the prediction of bound box, taking consideration of yolo v2/3.
+       - cleaning data (it`s really important!!!!!. Our generator scripts exist a lot of noisy) 
+       - pruning model
 
 current result
 
