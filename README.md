@@ -30,6 +30,7 @@ Pretrain model has been placed in models.
        - change the prediction of bound box, taking consideration of yolo v2/3.
        - cleaning data (it`s really important!!!!!. Our generator scripts exist a lot of noisy) 
        - pruning model
+       - attention (channel or feature attention)
 
 current result
 
