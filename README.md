@@ -3,6 +3,8 @@
 use coco dataset to detect head and shoulder. This implements is base on MTCNN
 Pretrain model has been placed in models. 
 
+<video src="https://raw.githubusercontent.com/StevenBanama/HeadShoulder/master/assets/sample_video.mp4" type="video/mp4">sample video exist in assets</video>
+
 ## prepare
 - download coco keypoints dataset 
 - python preprocess/coco.py --data-dir {your coco dataset } --anotation {anotation} -o {coco.feather}  #  collect keypoints and gen boundbox
